@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- ===================================== -->
+  <!-- META + HEAD                          -->
+  <!-- ===================================== -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NatureFlow Planner — Peaceful Productivity</title>
+  <meta name="description" content="A peaceful anime-nature themed productivity dashboard for tasks, projects, business, and flashcards." />
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet" />
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="theme-light">
+  <!-- ===================================== -->
+  <!-- ANIMATED NATURE BACKGROUND SCENE      -->
+  <!-- ===================================== -->
+  <div class="scene" aria-hidden="true">
+    <div class="sky"></div>
+    <div class="sun-moon"></div>
+    <div class="clouds">
+      <div class="cloud c1"></div>
+      <div class="cloud c2"></div>
+      <div class="cloud c3"></div>
+    </div>
+    <div class="mountains far"></div>
+    <div class="mountains near"></div>
+    <div class="forest"></div>
+    <div class="river">
+      <div class="water-shine"></div>
+      <div class="water-shine s2"></div>
+    </div>
+    <div class="grass"></div>
+    <div class="character" title="Sitting by the river">
+      <div class="char-body"></div>
+      <div class="char-head"></div>
+      <div class="char-hair"></div>
+    </div>
+    <div class="tree t1"></div>
+    <div class="tree t2"></div>
+    <div class="birds">
+      <span class="bird b1">︵</span>
+      <span class="bird b2">︵</span>
+    </div>
+    <div class="leaves">
+      <span class="leaf"></span>
+      <span class="leaf"></span>
+      <span class="leaf"></span>
+      <span class="leaf"></span>
+      <span class="leaf"></span>
+    </div>
+    <div class="fireflies">
+      <span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span>
+    </div>
+  </div>
+  <!-- ===================================== -->
+  <!-- APP SHELL (SIDEBAR + MAIN)            -->
+  <!-- ===================================== -->
+  <div class="app">
+    <!-- ===================================== -->
+    <!-- SIDEBAR                              -->
+    <!-- ===================================== -->
+    <aside class="sidebar glass" id="sidebar" aria-label="Primary navigation">
+      <div class="brand">
+        <div class="brand-mark">🌿</div>
+        <div>
+          <h1 class="brand-name">NatureFlow</h1>
+          <p class="brand-sub">Planner</p>
+        </div>
+      </div>
+      <nav class="nav">
+        <button class="nav-item active" data-view="dashboard"><i data-lucide="layout-dashboard"></i><span>Dashboard</span></button>
+        <button class="nav-item" data-view="primary"><i data-lucide="palette"></i><span>Primary Work</span></button>
+        <button class="nav-item" data-view="projects"><i data-lucide="folder-kanban"></i><span>Projects</span></button>
+        <button class="nav-item" data-view="marketing"><i data-lucide="megaphone"></i><span>Marketing</span></button>
+        <button class="nav-item" data-view="business"><i data-lucide="briefcase"></i><span>Business</span></button>
+        <button class="nav-item" data-view="secondary"><i data-lucide="book-open"></i><span>Secondary Work</span></button>
+        <button class="nav-item" data-view="soft"><i data-lucide="sparkles"></i><span>Soft Skills</span></button>
+        <button class="nav-item" data-view="random"><i data-lucide="list-todo"></i><span>Random Todo</span></button>
+        <button class="nav-item" data-view="flashcards"><i data-lucide="layers"></i><span>Flashcards</span></button>
+        <button class="nav-item" data-view="settings"><i data-lucide="settings"></i><span>Settings</span></button>
+      </nav>
+      <div class="sidebar-foot">
+        <p class="tiny muted">v1.0 · Local-first</p>
+      </div>
+    </aside>
+    <!-- ===================================== -->
+    <!-- MAIN CONTENT AREA                     -->
+    <!-- ===================================== -->
+    <main class="main">
+      <!-- ===================================== -->
+      <!-- TOP NAVIGATION                       -->
+      <!-- ===================================== -->
+      <header class="topbar glass">
+        <button class="icon-btn mobile-only" id="menuBtn" aria-label="Toggle menu"><i data-lucide="menu"></i></button>
+        <div class="search-wrap">
+          <i data-lucide="search"></i>
+          <input type="search" id="globalSearch" placeholder="Search tasks, flashcards, projects…" aria-label="Global search" />
+        </div>
+        <div class="top-actions">
+          <div class="clock" id="clock" aria-live="polite"></div>
+          <button class="icon-btn" id="themeToggle" aria-label="Toggle theme"><i data-lucide="moon"></i></button>
+        </div>
+      </header>
+      <!-- ===================================== -->
+      <!-- VIEW: DASHBOARD                      -->
+      <!-- ===================================== -->
+      <section class="view active" id="view-dashboard">
+        <div class="view-head">
+          <h2>Good day 🌸</h2>
+          <p class="muted" id="todayDate"></p>
+        </div>
+        <div class="stats-grid">
+          <div class="glass stat">
+            <div class="stat-label">Today's Tasks</div>
+            <div class="stat-value" id="statToday">0</div>
+          </div>
+          <div class="glass stat">
+            <div class="stat-label">Completed</div>
+            <div class="stat-value" id="statDone">0</div>
+          </div>
+          <div class="glass stat">
+            <div class="stat-label">Pending</div>
+            <div class="stat-value" id="statPending">0</div>
+          </div>
+          <div class="glass stat progress-stat">
+            <div class="stat-label">Progress</div>
+            <div class="stat-value" id="statPercent">0%</div>
+            <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+          </div>
+        </div>
+        <div class="two-col">
+          <div class="glass panel quote-panel">
+            <div class="panel-head"><i data-lucide="quote"></i><h3>Daily Quote</h3></div>
+            <p class="quote-text" id="dailyQuote">Loading…</p>
+          </div>
+          <div class="glass panel">
+            <div class="panel-head"><i data-lucide="check-circle-2"></i><h3>Today's Focus</h3></div>
+            <ul class="mini-list" id="miniList"><li class="muted">Nothing here yet — add a task to get started.</li></ul>
+          </div>
+        </div>
+      </section>
+      <!-- ===================================== -->
+      <!-- VIEW: PRIMARY WORK (Art/Anim/Design)  -->
+      <!-- ===================================== -->
+      <section class="view" id="view-primary">
+        <div class="view-head"><h2>Primary Work</h2><p class="muted">Your creative core.</p></div>
+        <div class="sections-grid" data-block="primary">
+          <div class="glass panel section-panel" data-section="Art"><div class="panel-head"><h3>🎨 Art</h3><button class="btn-mini add-task" data-block="primary" data-section="Art"><i data-lucide="plus"></i>Add</button></div><ul class="task-list" data-list="primary::Art"></ul></div>
+          <div class="glass panel section-panel" data-section="Animation"><div class="panel-head"><h3>✨ Animation</h3><button class="btn-mini add-task" data-block="primary" data-section="Animation"><i data-lucide="plus"></i>Add</button></div><ul class="task-list" data-list="primary::Animation"></ul></div>
+          <div class="glass panel section-panel" data-section="Design"><div class="panel-head"><h3>🖌️ Design</h3><button class="btn-mini add-task" data-block="primary" data-section="Design"><i data-lucide="plus"></i>Add</button></div><ul class="task-list" data-list="primary::Design"></ul></div>
+        </div>
+      </section>
+      <!-- ===================================== -->
+      <!-- VIEW: PROJECTS                       -->
+      <!-- ===================================== -->
+      <section class="view" id="view-projects">
+        <div class="view-head"><h2>Projects</h2><p class="muted">Personal builds & indie games.</p></div>
+        <div class="sections-grid two" data-block="projects">
+          <div class="glass panel section-panel" data-section="Personal Project"><div class="panel-head"><h3>🌱 Personal Project</h3><button class="btn-mini add-task" data-block="projects" data-section="Personal Project"><i data-lucide="plus"></i>Add</button></div><ul class="task-list" data-list="projects::Personal Project"></ul></div>
+          <div class="glass panel section-panel" data-section="Indie Game Development"><div class="panel-head"><h3>🎮 Indie Game Development</h3><button class="btn-mini add-task" data-block="projects" data-section="Indie Game Development"><i data-lucide="plus"></i>Add</button></div><ul class="task-list" data-list="projects::Indie Game Development"></ul></div>
+        </div>
+      </section>
+      <!-- ===================================== -->
+      <!-- VIEW: MARKETING                      -->
+      <!-- ===================================== -->
+      <section class="view" id="view-marketing">
+        <div class="view-head"><h2>Marketing</h2><p class="muted">Grow your community.</p></div>
+        <div class="sections-grid one" data-block="marketing">
+          <div class="glass panel section-panel" data-section="My Community"><div class="panel-head"><h3>📣 My Community</h3><button class="btn-mini add-task" data-block="marketing" data-section="My Community"><i data-lucide="plus"></i>Add</button></div><ul class="task-list" data-list="marketing::My Community"></ul></div>
+        </div>
+      </section>
+      <!-- ===================================== -->
+      <!-- VIEW: BUSINESS / CLIENT WORK          -->
+      <!-- ===================================== -->
+      <section class="view" id="view-business">
+        <div class="view-head"><h2>Business / Client Work</h2><p class="muted">Deliverables and deals.</p></div>
+        <div class="sections-grid two" data-block="business">
+          <div class="glass panel section-panel" data-section="Business"><div class="panel-head"><h3>💼 Business</h3><button class="btn-mini add-task" data-block="business" data-section="Business"><i data-lucide="plus"></i>Add</button></div><ul class="task-list" data-list="business::Business"></ul></div>
+          <div class="glass panel section-panel" data-section="Client Work"><div class="panel-head"><h3>🤝 Client Work</h3><button class="btn-mini add-task" data-block="business" data-section="Client Work"><i data-lucide="plus"></i>Add</button></div><ul class="task-list" data-list="business::Client Work"></ul></div>
+        </div>
+      </section>
+      <!-- ===================================== -->
+      <!-- VIEW: SECONDARY WORK                  -->
+      <!-- ===================================== -->
+      <section class="view" id="view-secondary">
+        <div class="view-head"><h2>Secondary Work</h2><p class="muted">Continuous learning.</p></div>
+        <div class="sections-grid" data-block="secondary">
+          <div class="glass panel section-panel" data-section="English Language"><div class="panel-head"><h3>🗣️ English Language</h3><button class="btn-mini add-task" data-block="secondary" data-section="English Language"><i data-lucide="plus"></i>Add</button></div><ul class="task-list" data-list="secondary::English Language"></ul></div>
+          <div class="glass panel section-panel" data-section="Programming"><div class="panel-head"><h3>💻 Programming</h3><button class="btn-mini add-task" data-block="secondary" data-section="Programming"><i data-lucide="plus"></i>Add</button></div><ul class="task-list" data-list="secondary::Programming"></ul></div>
+          <div class="glass panel section-panel" data-section="Game Development"><div class="panel-head"><h3>🕹️ Game Development</h3><button class="btn-mini add-task" data-block="secondary" data-section="Game Development"><i data-lucide="plus"></i>Add</button></div><ul class="task-list" data-list="secondary::Game Development"></ul></div>
+          <div class="glass panel section-panel" data-section="Nature / Space / Sci-Fi / Biology"><div class="panel-head"><h3>🌌 Nature · Space · Sci-Fi · Biology</h3><button class="btn-mini add-task" data-block="secondary" data-section="Nature / Space / Sci-Fi / Biology"><i data-lucide="plus"></i>Add</button></div><ul class="task-list" data-list="secondary::Nature / Space / Sci-Fi / Biology"></ul></div>
+        </div>
+      </section>
+      <!-- ===================================== -->
+      <!-- VIEW: SOFT SKILLS                     -->
+      <!-- ===================================== -->
+      <section class="view" id="view-soft">
+        <div class="view-head"><h2>Soft Skills</h2><p class="muted">Quick add — no categories.</p></div>
+        <div class="sections-grid one" data-block="soft">
+          <div class="glass panel section-panel" data-section="Soft Skills"><div class="panel-head"><h3>🌼 Soft Skills</h3><button class="btn-mini add-task" data-block="soft" data-section="Soft Skills"><i data-lucide="plus"></i>Add</button></div><ul class="task-list" data-list="soft::Soft Skills"></ul></div>
+        </div>
+      </section>
+      <!-- ===================================== -->
+      <!-- VIEW: RANDOM TODO                     -->
+      <!-- ===================================== -->
+      <section class="view" id="view-random">
+        <div class="view-head"><h2>Random Todo</h2><p class="muted">Quick tasks, no categories.</p></div>
+        <div class="sections-grid one" data-block="random">
+          <div class="glass panel section-panel" data-section="Random"><div class="panel-head"><h3>📝 Random</h3><button class="btn-mini add-task" data-block="random" data-section="Random"><i data-lucide="plus"></i>Add</button></div><ul class="task-list" data-list="random::Random"></ul></div>
+        </div>
+      </section>
+      <!-- ===================================== -->
+      <!-- VIEW: FLASHCARDS                      -->
+      <!-- ===================================== -->
+      <section class="view" id="view-flashcards">
+        <div class="view-head">
+          <div><h2>Flashcards</h2><p class="muted">Store important knowledge in beautiful cards.</p></div>
+          <button class="btn primary" id="addFlashcardBtn"><i data-lucide="plus"></i> New Flashcard</button>
+        </div>
+        <div class="flash-toolbar glass">
+          <input type="search" id="flashSearch" placeholder="Search flashcards…" />
+          <select id="flashFilter">
+            <option value="all">All</option>
+            <option value="pinned">Pinned</option>
+            <option value="favorite">Favorites</option>
+          </select>
+        </div>
+        <div class="flash-grid" id="flashGrid"></div>
+      </section>
+      <!-- ===================================== -->
+      <!-- VIEW: SETTINGS                        -->
+      <!-- ===================================== -->
+      <section class="view" id="view-settings">
+        <div class="view-head"><h2>Settings</h2><p class="muted">Make it yours.</p></div>
+        <div class="glass panel settings-panel">
+          <div class="setting-row">
+            <label>Theme</label>
+            <div class="btn-group">
+              <button class="chip" data-theme="light">Light</button>
+              <button class="chip" data-theme="dark">Dark</button>
+            </div>
+          </div>
+          <div class="setting-row">
+            <label for="fontSize">Font size</label>
+            <input type="range" id="fontSize" min="14" max="20" step="1" />
+          </div>
+          <div class="setting-row">
+            <label for="cardSize">Card size</label>
+            <input type="range" id="cardSize" min="0.9" max="1.2" step="0.05" />
+          </div>
+          <div class="setting-row">
+            <label for="animSpeed">Animation speed</label>
+            <input type="range" id="animSpeed" min="0.5" max="1.5" step="0.1" />
+          </div>
+          <div class="setting-row">
+            <label for="bgBlur">Background blur</label>
+            <input type="range" id="bgBlur" min="0" max="30" step="1" />
+          </div>
+          <div class="setting-row">
+            <label for="accent">Accent color</label>
+            <input type="color" id="accent" value="#4f9d7d" />
+          </div>
+          <div class="setting-row">
+            <label>Data</label>
+            <div class="btn-group">
+              <button class="chip" id="exportBtn">Export</button>
+              <button class="chip danger" id="clearBtn">Clear all</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <!-- ===================================== -->
+  <!-- TASK MODAL                            -->
+  <!-- ===================================== -->
+  <div class="modal-backdrop" id="taskModal" hidden>
+    <div class="glass modal" role="dialog" aria-modal="true" aria-labelledby="taskModalTitle">
+      <div class="modal-head">
+        <h3 id="taskModalTitle">New Task</h3>
+        <button class="icon-btn" data-close-modal="taskModal" aria-label="Close"><i data-lucide="x"></i></button>
+      </div>
+      <form id="taskForm" class="modal-body">
+        <input type="hidden" id="taskId" />
+        <input type="hidden" id="taskBlock" />
+        <input type="hidden" id="taskSection" />
+        <label>Title<input type="text" id="taskTitle" required maxlength="120" /></label>
+        <label>Description<textarea id="taskDesc" rows="2"></textarea></label>
+        <div class="row-2">
+          <label>Priority
+            <select id="taskPriority">
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+              <option value="critical">Critical</option>
+            </select>
+          </label>
+          <label>Deadline<input type="date" id="taskDeadline" /></label>
+        </div>
+        <div class="row-2">
+          <label>Tags (comma separated)<input type="text" id="taskTags" placeholder="focus, urgent" /></label>
+          <label>Progress
+            <input type="range" id="taskProgress" min="0" max="100" step="5" value="0" />
+          </label>
+        </div>
+        <label>Notes<textarea id="taskNotes" rows="2"></textarea></label>
+        <div class="modal-actions">
+          <button type="button" class="btn ghost" data-close-modal="taskModal">Cancel</button>
+          <button type="submit" class="btn primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <!-- ===================================== -->
+  <!-- FLASHCARD MODAL                       -->
+  <!-- ===================================== -->
+  <div class="modal-backdrop" id="flashModal" hidden>
+    <div class="glass modal" role="dialog" aria-modal="true">
+      <div class="modal-head">
+        <h3>Flashcard</h3>
+        <button class="icon-btn" data-close-modal="flashModal" aria-label="Close"><i data-lucide="x"></i></button>
+      </div>
+      <form id="flashForm" class="modal-body">
+        <input type="hidden" id="flashId" />
+        <label>Title<input type="text" id="flashTitle" required /></label>
+        <label>Category<input type="text" id="flashCategory" placeholder="e.g. Biology" /></label>
+        <label>Description<textarea id="flashDesc" rows="4" required></textarea></label>
+        <label>Tags (comma separated)<input type="text" id="flashTags" /></label>
+        <label>Color
+          <input type="color" id="flashColor" value="#7dbfa0" />
+        </label>
+        <div class="modal-actions">
+          <button type="button" class="btn ghost" data-close-modal="flashModal">Cancel</button>
+          <button type="submit" class="btn primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <!-- ===================================== -->
+  <!-- SCRIPTS                               -->
+  <!-- ===================================== -->
+  <script src="storage.js"></script>
+  <script src="theme.js"></script>
+  <script src="animation.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
