@@ -903,8 +903,15 @@
     setTimeout(() => { if (typeof window.renderAll === 'function') window.renderAll(); }, 0);
     // Expose for debugging / integration.
     window.BlockStore = BlockStore;
-    window.NFBlocks = { refreshAll, openBlockModal, openCategoryModal };
+    window.NFBlocks = {
+      refreshAll,
+      openBlockModal,
+      openCategoryModal,
+      // Called by backup.js after import: drop cache & rebuild sidebar/views.
+      rebuild() { BlockStore._cache = null; refreshAll(); },
+    };
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
 })();
+  

@@ -8,11 +8,23 @@
   /* ===========================================
      CONSTANTS
      =========================================== */
-  const APP_VERSION = '1.1.0';
+  const APP_VERSION = '1.2.0';
+  const SCHEMA_VERSION = 2;
+  const BACKUP_VERSION = 2;
   const LAST_BACKUP_KEY = 'nf_last_backup_v1';
   const REMINDER_SNOOZE_KEY = 'nf_backup_reminder_snooze_v1';
+  const BLOCKS_KEY = 'nf_blocks_v1'
   const REMINDER_DAYS = 7;
-  const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB safety cap
+  const MAX_FILE_BYTES = 10 * 1024 * 1024;
+  /* Keys treated as "planner state" — mirrored verbatim in exports
+     so an import can rebuild the exact LocalStorage snapshot. */
+  const KNOWN_STATE_KEYS = [
+    'nf_tasks_v1',
+    'nf_flashcards_v1',
+    'nf_settings_v1',
+    'nf_blocks_v1',
+    'nf_blocks_migration_v1',
+  ];
   /* ===========================================
      SMALL UTILS
      =========================================== */
@@ -28,28 +40,89 @@
   /* ===========================================
      EXPORT — build enriched backup payload
      =========================================== */
+ /* ===========================================
+     COMPLETE PLANNER EXPORT SYSTEM
+     -------------------------------------------
+     Builds a full planner snapshot: workspace
+     structure (blocks + categories), tasks,
+     flashcards, settings, ALL known LocalStorage
+     keys, and rich metadata. Returns a plain
+     object ready to serialise as JSON.
+     =========================================== */
+  function readBlocksState() {
+    // Prefer live BlockStore cache when blocks.js is loaded, else raw storage.
+    try {
+      if (typeof window.BlockStore !== 'undefined' && typeof window.BlockStore.load === 'function') {
+        return window.BlockStore.load();
+      }
+    } catch (_) {}
+    return Storage.read(BLOCKS_KEY, null);
+  }
+  function snapshotLocalStorage() {
+    // Capture every known planner key verbatim + any nf_* keys we don't
+    // recognise so forward-compat data isn't silently dropped.
+    const snap = {};
+    const seen = new Set();
+    for (const k of KNOWN_STATE_KEYS) {
+      seen.add(k);
+      const raw = localStorage.getItem(k);
+      snap[k] = raw == null ? null : safeParse(raw);
+    }
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k || seen.has(k)) continue;
+        if (!k.startsWith('nf_')) continue;
+        snap[k] = safeParse(localStorage.getItem(k));
+      }
+    } catch (_) {}
+    return snap;
+  }
+  function safeParse(raw) {
+    try { return JSON.parse(raw); } catch (_) { return raw; }
+  }
+
   function buildBackupPayload() {
     const tasks = TaskStore.all();
     const flashcards = FlashStore.all();
     const settings = SettingsStore.get();
-    const categories = Array.from(
-      new Set([
-        ...tasks.map((t) => t.section).filter(Boolean),
-        ...flashcards.map((c) => c.category).filter(Boolean),
-      ]),
-    );
+
+    const blocksState = readBlocksState();
+    const blocks = (blocksState && Array.isArray(blocksState.blocks)) ? blocksState.blocks : [];
+    // Derive category list from live workspace, falling back to task/flash tags.
+    const structuredCats = [];
+    for (const b of blocks) for (const c of (b.categories || [])) structuredCats.push(c.name);
+    const derivedCats = Array.from(new Set([
+      ...structuredCats,
+      ...tasks.map((t) => t.section).filter(Boolean),
+      ...flashcards.map((c) => c.category).filter(Boolean),
+    ]));
+
+    
     const now = new Date();
     return {
       app: 'NatureFlow Planner',
       version: APP_VERSION,
+      schemaVersion: SCHEMA_VERSION,
+      backupVersion: BACKUP_VERSION,
       exportedAt: now.toISOString(),
       exportDate: now.toLocaleDateString(),
       exportTime: now.toLocaleTimeString(),
-      totals: { tasks: tasks.length, flashcards: flashcards.length, categories: categories.length },
+       totals: {
+        blocks: blocks.length,
+        categories: structuredCats.length,
+        tasks: tasks.length,
+        flashcards: flashcards.length,
+      },
+      // Legacy fields kept for backward compatibility with v1 backups.
       theme: settings.theme,
-      categories,
+      categories: derivedCats,
       settings,
+      // Full workspace structure (order preserved via array order).
+      workspace: { blocks: blocksState || { version: 1, blocks: [] } },
       data: { tasks, flashcards },
+      // Verbatim LocalStorage snapshot — the authoritative restore source.
+      localStorage: snapshotLocalStorage(),
     };
   }
   /* ===========================================
@@ -72,9 +145,11 @@
       downloadJSON(payload, `natureflow-export-${stamp()}.json`);
       setLastBackupDate(new Date().toISOString());
       showNotification('✓ Backup exported', [
+        `${payload.totals.blocks} Blocks`,
+        `${payload.totals.categories} Categories`,
         `${payload.totals.tasks} Tasks`,
         `${payload.totals.flashcards} Flashcards`,
-        `${payload.totals.categories} Categories`,
+        
       ]);
       refreshBackupStatus();
     } catch (err) {
@@ -91,11 +166,16 @@
     downloadJSON(payload, `planner-backup-before-import-${stamp()}.json`);
   }
   /* ===========================================
-     VALIDATION — sanity-check imported JSON
+    COMPLETE PLANNER IMPORT SYSTEM — validation
+     -------------------------------------------
+     Accepts both v1 (tasks/flashcards only) and
+     v2 (with workspace + localStorage snapshot).
+     Missing newer fields are backfilled with
+     safe defaults instead of failing.
      =========================================== */
   function validateBackup(obj) {
     if (!obj || typeof obj !== 'object') return { ok: false, reason: 'File is empty or not a JSON object.' };
-    // Accept our enriched shape OR the older shape from script.js's Export.
+  
     const tasks = obj?.data?.tasks ?? obj?.tasks;
     const flashcards = obj?.data?.flashcards ?? obj?.flashcards;
     if (!Array.isArray(tasks)) return { ok: false, reason: 'Missing or invalid "tasks" array.' };
@@ -112,50 +192,143 @@
     if (settings != null && (typeof settings !== 'object' || Array.isArray(settings))) {
       return { ok: false, reason: '"settings" must be an object.' };
     }
-    return { ok: true, tasks, flashcards, settings: settings || null };
+       // Workspace (blocks) — optional for v1 backups.
+    let workspace = null;
+    const wsRaw = obj?.workspace?.blocks ?? obj?.localStorage?.[BLOCKS_KEY];
+    if (wsRaw && typeof wsRaw === 'object') {
+      const blocks = Array.isArray(wsRaw.blocks) ? wsRaw.blocks : (Array.isArray(wsRaw) ? wsRaw : null);
+      if (blocks) {
+        for (const b of blocks) {
+          if (!b || typeof b !== 'object') return { ok: false, reason: 'A block entry is invalid.' };
+          if (b.categories && !Array.isArray(b.categories)) return { ok: false, reason: 'Block "categories" must be an array.' };
+        }
+        workspace = { version: wsRaw.version || 1, blocks };
+      }
+    }
+    const lsSnap = (obj.localStorage && typeof obj.localStorage === 'object') ? obj.localStorage : null;
+    return { ok: true, tasks, flashcards, settings: settings || null, workspace, localStorage: lsSnap };
   }
   /* ===========================================
      MERGE MODE — combine imported data with existing
+     -------------------------------------------
+     • Blocks: match by id, then by name. Missing
+       blocks are appended (order preserved).
+     • Categories: match by id/name within block;
+       missing categories appended in order.
+     • Tasks/Flashcards: dedupe by id or content key.
      =========================================== */
   function mergePlannerData(imported) {
+        // 1) Merge workspace first so task refs remain valid.
+    let addedBlocks = 0, addedCats = 0;
+    if (imported.workspace && Array.isArray(imported.workspace.blocks)) {
+      const currentState = readBlocksState() || { version: 1, blocks: [] };
+      const current = Array.isArray(currentState.blocks) ? currentState.blocks.slice() : [];
+      const byId   = new Map(current.map((b) => [b.id, b]));
+      const byName = new Map(current.map((b) => [b.name, b]));
+      for (const inB of imported.workspace.blocks) {
+        const match = byId.get(inB.id) || byName.get(inB.name);
+        if (!match) {
+          current.push(deepClone(inB));
+          byId.set(inB.id, inB);
+          byName.set(inB.name, inB);
+          addedBlocks++;
+          continue;
+        }
+        // Merge categories preserving order.
+        const catById   = new Map((match.categories || []).map((c) => [c.id, c]));
+        const catByName = new Map((match.categories || []).map((c) => [c.name, c]));
+        for (const inC of (inB.categories || [])) {
+          if (catById.has(inC.id) || catByName.has(inC.name)) continue;
+          match.categories = match.categories || [];
+          match.categories.push(deepClone(inC));
+          catById.set(inC.id, inC);
+          catByName.set(inC.name, inC);
+          addedCats++;
+        }
+      }
+      Storage.write(BLOCKS_KEY, { version: currentState.version || 1, blocks: current });
+      if (window.BlockStore) window.BlockStore._cache = null;
+    }
+    // 2) Tasks + flashcards.
     const existingTasks = TaskStore.all();
     const existingFlash = FlashStore.all();
     const taskKey = (t) => t.id || `${t.title}::${t.block}::${t.section}::${t.deadline || ''}`;
     const flashKey = (c) => c.id || `${c.title}::${c.category}`;
     const taskSeen = new Set(existingTasks.map(taskKey));
     const flashSeen = new Set(existingFlash.map(flashKey));
-    let addedTasks = 0;
-    let addedFlash = 0;
+    let addedTasks = 0, addedFlash = 0;
     const mergedTasks = existingTasks.slice();
     for (const t of imported.tasks) {
       const k = taskKey(t);
       if (taskSeen.has(k)) continue;
-      taskSeen.add(k);
-      mergedTasks.push(t);
-      addedTasks++;
+      taskSeen.add(k); mergedTasks.push(t); addedTasks++;
     }
     const mergedFlash = existingFlash.slice();
     for (const c of imported.flashcards) {
       const k = flashKey(c);
       if (flashSeen.has(k)) continue;
-      flashSeen.add(k);
-      mergedFlash.push(c);
-      addedFlash++;
+      flashSeen.add(k); mergedFlash.push(c); addedFlash++;
     }
     TaskStore.save(mergedTasks);
     FlashStore.save(mergedFlash);
-    return { tasks: addedTasks, flashcards: addedFlash };
+    return { blocks: addedBlocks, categories: addedCats, tasks: addedTasks, flashcards: addedFlash };
   }
   /* ===========================================
      REPLACE MODE — safety backup then overwrite
+    -------------------------------------------
+     Restores in strict order: Settings → Blocks
+     → Tasks → Flashcards, then rehydrates any
+     remaining LocalStorage keys from the
+     snapshot so nothing is left behind.
      =========================================== */
   function replacePlannerData(imported) {
     createSafetyBackup();
-    TaskStore.save(imported.tasks);
-    FlashStore.save(imported.flashcards);
+
+     // 1) Settings
     if (imported.settings) SettingsStore.set(imported.settings);
-    return { tasks: imported.tasks.length, flashcards: imported.flashcards.length };
+    // 2) Blocks (workspace structure). Prefer explicit workspace,
+    // fall back to localStorage snapshot's blocks key.
+    if (imported.workspace) {
+      Storage.write(BLOCKS_KEY, imported.workspace);
+      if (window.BlockStore) window.BlockStore._cache = null;
+    } else if (imported.localStorage && imported.localStorage[BLOCKS_KEY]) {
+      Storage.write(BLOCKS_KEY, imported.localStorage[BLOCKS_KEY]);
+      if (window.BlockStore) window.BlockStore._cache = null;
+    }
+
+    // 3) Tasks (order preserved from file)
+    TaskStore.save(imported.tasks);
+
+    // 4) Flashcards (order preserved from file)
+    FlashStore.save(imported.flashcards);
+    
+
+    // 5) Any additional planner LocalStorage keys from the snapshot
+    // that we haven't already restored above.
+    if (imported.localStorage) {
+      const handled = new Set(['nf_tasks_v1', 'nf_flashcards_v1', 'nf_settings_v1', BLOCKS_KEY]);
+      for (const [k, v] of Object.entries(imported.localStorage)) {
+        if (handled.has(k)) continue;
+        if (v == null) { localStorage.removeItem(k); continue; }
+        try {
+          localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
+        } catch (_) {}
+      }
+    }
+    const wsBlocks = imported.workspace?.blocks?.length || 0;
+    const wsCats = (imported.workspace?.blocks || []).reduce((n, b) => n + ((b.categories || []).length), 0);
+    return {
+      blocks: wsBlocks,
+      categories: wsCats,
+      tasks: imported.tasks.length,
+      flashcards: imported.flashcards.length,
+    };
   }
+
+  function deepClone(v) {
+    try { return JSON.parse(JSON.stringify(v)); } catch (_) { return v; }
+  }
+  
   /* ===========================================
      IMPORT ENTRY POINT — file → validate → confirm → apply
      =========================================== */
@@ -186,11 +359,19 @@
           else return; // cancelled
           // Notify the rest of the app so lists re-render without a hard reload.
           try { window.dispatchEvent(new CustomEvent('nf:data-imported')); } catch (_) {}
+          // Rebuild blocks/sidebar/views if blocks.js exposes a rebuild hook.
+          if (window.NFBlocks && typeof window.NFBlocks.rebuild === 'function') {
+            try { window.NFBlocks.rebuild(); } catch (_) {}
+          }
           if (typeof window.renderAll === 'function') window.renderAll();
           if (typeof window.renderFlashcards === 'function') window.renderFlashcards();
+
+          const verb = mode === 'merge' ? 'added' : 'imported';
           showNotification('✓ Planner restored successfully', [
-            `${summary.tasks} Tasks ${mode === 'merge' ? 'added' : 'imported'}`,
-            `${summary.flashcards} Flashcards ${mode === 'merge' ? 'added' : 'imported'}`,
+            `${summary.blocks || 0} Blocks ${verb}`,
+            `${summary.categories || 0} Categories ${verb}`,
+            `${summary.tasks} Tasks ${verb}`,
+            `${summary.flashcards} Flashcards ${verb}`,
             `Mode: ${mode}`,
           ]);
         } catch (err) {
@@ -282,6 +463,8 @@
         <h3>Import planner data</h3>
         <p>This will modify your planner data. Choose how to apply the import:</p>
         <ul>
+          <li>${(preview.workspace?.blocks?.length) || 0} blocks</li>
+          <li>${(preview.workspace?.blocks || []).reduce((n, b) => n + ((b.categories || []).length), 0)} categories</li>
           <li>${preview.tasks.length} tasks</li>
           <li>${preview.flashcards.length} flashcards</li>
         </ul>
