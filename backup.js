@@ -215,7 +215,19 @@
        blocks are appended (order preserved).
      • Categories: match by id/name within block;
        missing categories appended in order.
-     • Tasks/Flashcards: dedupe by id or content key.
+     • Tasks/Flashcards: dedupe by id, or — when a
+       record has no id — by a content key of
+       title::block::section::deadline (tasks) or
+       title::category (flashcards). Existing records
+       are never overwritten, only added to.
+     KNOWN SHARP EDGE: two genuinely different tasks
+     that happen to share title+block+section with no
+     deadline will collide on the content key and the
+     import will be silently skipped as a "duplicate".
+     This has not been changed here — see
+     docs/ENGINEERING-NOTES.md for why, and what a
+     real fix (e.g. content-hash the full record) would
+     look like.
      =========================================== */
   function mergePlannerData(imported) {
         // 1) Merge workspace first so task refs remain valid.
