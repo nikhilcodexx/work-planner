@@ -431,14 +431,11 @@ function escapeHtml(s = '') {
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[m]));
 }
-function cssEscape(s = '') {
-  return String(s).replace(/"/g, '\\"');
-}
 /* ===========================================
    NODE/TEST EXPORTS
    Only defined under a CommonJS module system (node:test).
    Browser behavior above is unchanged.
    =========================================== */
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { debounce, matchesSearch, escapeHtml, cssEscape };
+  module.exports = { debounce, matchesSearch, escapeHtml };
 }
