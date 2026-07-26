@@ -229,3 +229,36 @@ test('replacePlannerData overwrites tasks verbatim and takes a safety backup fir
   assert.equal(result.tasks, 1);
   assert.equal(result.flashcards, 1);
 });
+
+test('replacePlannerData only writes nf_-namespaced keys from an imported localStorage snapshot, never arbitrary ones', () => {
+  resetState();
+  global.document = {
+    createElement: () => ({ click() {}, remove() {} }),
+    body: { appendChild() {} },
+  };
+  global.Blob = class { constructor(parts) { this.parts = parts; } };
+  global.URL = { createObjectURL: () => 'blob:fake', revokeObjectURL: () => {} };
+
+  const setSpy = [];
+  const removeSpy = [];
+  const realSetItem = global.localStorage.setItem;
+  const realRemoveItem = global.localStorage.removeItem;
+  global.localStorage.setItem = (k, v) => { setSpy.push(k); realSetItem(k, v); };
+  global.localStorage.removeItem = (k) => { removeSpy.push(k); realRemoveItem(k); };
+
+  replacePlannerData({
+    tasks: [], flashcards: [], settings: null, workspace: null,
+    localStorage: {
+      nf_blocks_migration_v1: { done: true },       // ours — should be written
+      evil_other_app_key: 'overwritten',              // NOT ours — must be rejected
+      __proto__: 'ignored-anyway',                    // NOT ours — must be rejected
+    },
+  });
+
+  global.localStorage.setItem = realSetItem;
+  global.localStorage.removeItem = realRemoveItem;
+
+  assert.ok(setSpy.includes('nf_blocks_migration_v1'), 'an nf_-namespaced key should be restored');
+  assert.ok(!setSpy.includes('evil_other_app_key'), 'a key outside the nf_ namespace must never be written');
+  assert.ok(!removeSpy.includes('evil_other_app_key'));
+});
