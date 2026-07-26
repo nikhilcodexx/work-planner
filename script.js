@@ -9,6 +9,13 @@ const $  = (sel, ctx = document) => ctx.querySelector(sel);
 const $$ = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 const todayISO = () => new Date().toISOString().slice(0, 10);
+function debounce(fn, ms) {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
+  };
+}
 /* ===================================== */
 /* DAILY QUOTES                          */
 /* ===================================== */
@@ -25,6 +32,7 @@ const QUOTES = [
 /* ===================================================================
    INITIAL BOOTSTRAP
    =================================================================== */
+if (typeof document !== 'undefined') {
 document.addEventListener('DOMContentLoaded', () => {
   Theme.apply(SettingsStore.get());
   bindNavigation();
@@ -38,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
   showDailyQuote();
   if (window.lucide) window.lucide.createIcons();
 });
+} // end typeof document guard
 /* ===================================================================
    NAVIGATION BETWEEN VIEWS
    =================================================================== */
@@ -214,11 +223,12 @@ function renderAll() {
   const tasks = TaskStore.all();
   const search = ($('#globalSearch')?.value || '').toLowerCase().trim();
   // Clear all lists
-  $$('.task-list').forEach((ul) => (ul.innerHTML = ''));
-  // Group tasks per list
+  const lists = new Map($$('.task-list').map((ul) => (ul.innerHTML = '', [ul.dataset.list, ul])));
+  // Group tasks per list — one lookup map built once, instead of a
+  // querySelector per task.
   tasks.forEach((t) => {
     if (search && !matchesSearch(t, search)) return;
-    const listEl = document.querySelector(`.task-list[data-list="${cssEscape(t.block)}::${cssEscape(t.section)}"]`);
+    const listEl = lists.get(`${t.block}::${t.section}`);
     if (listEl) listEl.appendChild(renderTask(t));
   });
   // Dashboard stats
@@ -243,9 +253,14 @@ function renderAll() {
   if (window.lucide) window.lucide.createIcons();
 }
 function matchesSearch(t, q) {
+  // Lowercase the query here too, not just the haystack — matchesSearch
+  // should be case-insensitive on its own rather than silently depending
+  // on every caller pre-lowercasing (a characterization test caught this:
+  // matchesSearch(task, 'WRITE') used to return false).
+  const needle = String(q || '').toLowerCase();
   const hay = [t.title, t.description, t.section, t.block, (t.tags || []).join(' '), t.notes]
     .filter(Boolean).join(' ').toLowerCase();
-  return hay.includes(q);
+  return hay.includes(needle);
 }
 function renderTask(t) {
   const li = document.createElement('li');
@@ -275,10 +290,10 @@ function renderTask(t) {
    GLOBAL SEARCH
    =================================================================== */
 function bindSearch() {
-  $('#globalSearch')?.addEventListener('input', () => {
+  $('#globalSearch')?.addEventListener('input', debounce(() => {
     renderAll();
     renderFlashcards();
-  });
+  }, 150));
 }
 /* ===================================================================
    FLASHCARDS
@@ -418,4 +433,12 @@ function escapeHtml(s = '') {
 }
 function cssEscape(s = '') {
   return String(s).replace(/"/g, '\\"');
+}
+/* ===========================================
+   NODE/TEST EXPORTS
+   Only defined under a CommonJS module system (node:test).
+   Browser behavior above is unchanged.
+   =========================================== */
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { debounce, matchesSearch, escapeHtml, cssEscape };
 }
