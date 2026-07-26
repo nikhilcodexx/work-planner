@@ -196,7 +196,54 @@ This runs `node --test` (Node's built-in test runner, available since
 Node 18, zero external dependencies — matching this project's existing
 zero-dependency approach) against everything in `test/`.
 
-## 9. Deferred / future work
+## 9. Security audit
+
+Alongside the perf/TDD work, this branch also got a quick security pass —
+worth doing on any repo before you consider it "done," not just this one.
+
+**Credentials sweep: clean.** Checked the working tree *and* the full git
+history (`git log --all -p`, plus a filename search across every commit)
+for API keys, tokens, passwords, private keys, `.env` files, and similarly
+shaped secrets. Nothing found. If you ever *do* accidentally commit a
+secret, note that deleting it in a later commit isn't enough — it's still
+sitting in the git history forever unless you rewrite it out, which is why
+it's worth checking history, not just the current files.
+
+**XSS:** checked every `innerHTML` call site against what's being
+interpolated into it. The app is consistent about running user-controlled
+strings (task titles, tags, block/category names) through `escapeHtml()`
+before they touch `innerHTML` — genuinely careful, and worth keeping up as
+the pattern to follow for anything new.
+
+**Two real findings, both fixed on this branch:**
+
+- **Unpinned CDN script, no integrity check.** `index.html` loaded
+  `lucide@latest` from unpkg — a floating version with no verification.
+  A future release of that package (or a compromise of unpkg / the
+  package itself) would have executed with full page privileges,
+  automatically, with nobody reviewing it first. Fixed by pinning to the
+  exact version in use (`1.27.0`) and adding a Subresource Integrity hash
+  (`integrity="sha384-..."` + `crossorigin="anonymous"`) — the browser now
+  refuses to run the script if the bytes it receives don't match that
+  hash. This is the standard fix any time you load a third-party script
+  from a CDN rather than bundling it yourself: pin the version, add SRI.
+- **Unrestricted `localStorage` key write on import.** `replacePlannerData()`
+  wrote *every* key found in an imported backup file's `localStorage`
+  snapshot, with nothing checking that the key actually belonged to this
+  app. `localStorage` is scoped by **origin**, not by path — so
+  `nikhilcodexx.github.io/work-planner` and any other project you host
+  under `nikhilcodexx.github.io/*` share the same storage. A crafted or
+  corrupted "backup" file could have silently overwritten data belonging
+  to a *different* project on the same domain. Fixed by restricting the
+  import loop to keys starting with `nf_` (this app's own namespace) —
+  covered by a test in `test/backup.test.js` that imports a file
+  containing an `evil_other_app_key` and asserts it's never written. The
+  general lesson: any time you deserialize an untrusted file and use its
+  keys to write into shared state (storage, an object, a database column),
+  validate the keys against an allowlist — don't trust the file to only
+  contain keys you expect.
+
+## 10. Deferred / future work
 
 Noted here on purpose rather than done silently, so it's a conscious
 backlog rather than scope creep:
@@ -211,3 +258,8 @@ backlog rather than scope creep:
 - **A linter.** Nothing wrong was found that a linter would have caught
   here, but it's cheap insurance as the codebase grows past ~3000 lines by
   hand.
+- **A Content-Security-Policy meta tag.** Not fixing anything currently
+  broken — there's no user-generated page content and no iframes — but
+  cheap defense-in-depth given the app already loads one external script,
+  and a CSP would make a future accidental `eval`/inline-script mistake
+  fail loudly instead of silently working.
