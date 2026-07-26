@@ -316,11 +316,16 @@
     
 
     // 5) Any additional planner LocalStorage keys from the snapshot
-    // that we haven't already restored above.
+    // that we haven't already restored above. Restricted to our own
+    // "nf_" namespace: a backup file is untrusted input (someone could
+    // hand-craft or corrupt one), and localStorage is scoped per-origin,
+    // not per-path — an unfiltered key here could overwrite data
+    // belonging to a *different* app hosted on the same origin.
     if (imported.localStorage) {
       const handled = new Set(['nf_tasks_v1', 'nf_flashcards_v1', 'nf_settings_v1', BLOCKS_KEY]);
       for (const [k, v] of Object.entries(imported.localStorage)) {
         if (handled.has(k)) continue;
+        if (typeof k !== 'string' || !k.startsWith('nf_')) continue;
         if (v == null) { localStorage.removeItem(k); continue; }
         try {
           localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
