@@ -234,6 +234,34 @@ a { color: inherit; }
   50%     { opacity: 1;   transform: translateY(-10px); }
 }
 /* ===================================================================
+   ANIMATION CONTROL
+   The scene (clouds/water/character/birds/leaves/fireflies) and the
+   Critical-task pulse both loop forever by default. Two independent
+   guards keep that from burning CPU/GPU when it isn't buying anyone
+   anything:
+   1. prefers-reduced-motion — respects the user's OS-level motion
+      setting. The Critical pulse still needs to *read* as urgent
+      without moving, so it gets a static ring instead of no signal.
+   2. .anim-paused (toggled by animation.js via visibilitychange) —
+      freezes everything while the tab is in the background, since
+      an off-screen animation can't be seen and shouldn't be costing
+      anything. This is independent of the --anim speed slider in
+      Settings, which still controls speed whenever motion does run.
+   =================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .scene * {
+    animation: none !important;
+  }
+  .task.p-critical {
+    animation: none !important;
+    box-shadow: 0 0 0 3px rgba(226,107,107,0.5);
+  }
+}
+body.anim-paused .scene *,
+body.anim-paused .task.p-critical {
+  animation-play-state: paused !important;
+}
+/* ===================================================================
    APP SHELL LAYOUT
    =================================================================== */
 .app {
