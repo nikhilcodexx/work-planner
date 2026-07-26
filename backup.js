@@ -596,6 +596,19 @@
     // Delay reminder slightly so the app UI settles first.
     setTimeout(checkBackupReminder, 1200);
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
-  else boot();
+  if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+    else boot();
+  }
+  /* ===========================================
+     NODE/TEST EXPORTS
+     Only defined under a CommonJS module system (node:test).
+     Browser behavior above (window.NFBackup, boot()) is unchanged.
+     =========================================== */
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+      validateBackup, mergePlannerData, replacePlannerData,
+      snapshotLocalStorage, buildBackupPayload, daysSince,
+    };
+  }
 })();
