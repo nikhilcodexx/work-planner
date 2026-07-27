@@ -215,7 +215,19 @@
        blocks are appended (order preserved).
      • Categories: match by id/name within block;
        missing categories appended in order.
-     • Tasks/Flashcards: dedupe by id or content key.
+     • Tasks/Flashcards: dedupe by id, or — when a
+       record has no id — by a content key of
+       title::block::section::deadline (tasks) or
+       title::category (flashcards). Existing records
+       are never overwritten, only added to.
+     KNOWN SHARP EDGE: two genuinely different tasks
+     that happen to share title+block+section with no
+     deadline will collide on the content key and the
+     import will be silently skipped as a "duplicate".
+     This has not been changed here — see
+     docs/ENGINEERING-NOTES.md for why, and what a
+     real fix (e.g. content-hash the full record) would
+     look like.
      =========================================== */
   function mergePlannerData(imported) {
         // 1) Merge workspace first so task refs remain valid.
@@ -304,11 +316,16 @@
     
 
     // 5) Any additional planner LocalStorage keys from the snapshot
-    // that we haven't already restored above.
+    // that we haven't already restored above. Restricted to our own
+    // "nf_" namespace: a backup file is untrusted input (someone could
+    // hand-craft or corrupt one), and localStorage is scoped per-origin,
+    // not per-path — an unfiltered key here could overwrite data
+    // belonging to a *different* app hosted on the same origin.
     if (imported.localStorage) {
       const handled = new Set(['nf_tasks_v1', 'nf_flashcards_v1', 'nf_settings_v1', BLOCKS_KEY]);
       for (const [k, v] of Object.entries(imported.localStorage)) {
         if (handled.has(k)) continue;
+        if (typeof k !== 'string' || !k.startsWith('nf_')) continue;
         if (v == null) { localStorage.removeItem(k); continue; }
         try {
           localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
@@ -596,6 +613,19 @@
     // Delay reminder slightly so the app UI settles first.
     setTimeout(checkBackupReminder, 1200);
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
-  else boot();
+  if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+    else boot();
+  }
+  /* ===========================================
+     NODE/TEST EXPORTS
+     Only defined under a CommonJS module system (node:test).
+     Browser behavior above (window.NFBackup, boot()) is unchanged.
+     =========================================== */
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+      validateBackup, mergePlannerData, replacePlannerData,
+      snapshotLocalStorage, buildBackupPayload, daysSince,
+    };
+  }
 })();

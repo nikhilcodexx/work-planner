@@ -11,7 +11,11 @@ NatureFlow-Planner/
 ├── script.js           # App logic (tasks, flashcards, rendering, search)
 ├── storage.js          # LocalStorage abstraction
 ├── theme.js            # Theme + settings application
-├── animation.js        # Ripple effects + micro-animations
+├── animation.js        # Ripple effects, micro-animations, tab-visibility pause
+├── blocks.js            # Custom Blocks/Categories: create, rename, reorder, delete
+├── backup.js            # Export / import / backup reminders, with v1→v2 migration
+├── test/                # node:test unit + characterization tests (`npm test`)
+├── docs/ENGINEERING-NOTES.md  # Why each perf/TDD fix in this branch was made
 ├── README.md
 └── assets/
     ├── images/
@@ -19,19 +23,19 @@ NatureFlow-Planner/
     └── fonts/
 ```
 ## ✨ Features
-- 🎋 Animated anime-nature background scene (river, character, forest, clouds, birds, leaves, fireflies at night)
+- 🎋 Animated anime-nature background scene (river, character, forest, clouds, birds, leaves, fireflies at night) — respects `prefers-reduced-motion` and pauses while the tab is hidden
 - 🧊 Glassmorphism cards with soft shadows
 - ☀️ / 🌙 Light & Dark themes (Dark mode = night beside a peaceful river)
-- 📋 Task manager across 7 blocks (Primary Work, Projects, Marketing, Business, Secondary Work, Soft Skills, Random Todo)
+- 📋 Task manager with fully custom Blocks and Categories — create, rename, reorder, move, and delete your own (no hardcoded blocks)
 - 🃏 Flashcards with tags, categories, colors, pin, favorite, search
-- 🔍 Global search across tasks + flashcards
+- 🔍 Global search across tasks + flashcards (debounced)
 - 🎯 Priorities: Low / Medium / High / Critical (each color-coded, Critical pulses)
 - 🚀 Drag & Drop tasks between sections and blocks
 - 📊 Live dashboard: today's tasks, completed, pending, progress %
 - 💬 Daily quote
 - ⏰ Live clock & date
 - 💾 Everything auto-saves to LocalStorage
-- 📥 Export data as JSON · 🗑️ Clear all data
+- 📥 Export / 📤 Import data as JSON (merge or replace), with periodic backup reminders
 - ⚙️ Settings: theme, font size, card size, animation speed, background blur, accent color
 - 📱 Fully responsive (desktop, laptop, tablet, mobile)
 ## 🚀 Installation
@@ -44,13 +48,20 @@ python3 -m http.server 8000
 npx serve .
 ```
 Then visit `http://localhost:8000`.
+## ✅ Running the tests
+```bash
+npm test
+```
+Runs `node --test` (Node 18+, zero dependencies) over `test/`. See `docs/ENGINEERING-NOTES.md` for what's covered and why.
 ## 💾 How LocalStorage Works
-All data is saved under three keys:
-| Key                 | Contents                       |
-| ------------------- | ------------------------------ |
-| `nf_tasks_v1`       | Array of task objects          |
-| `nf_flashcards_v1`  | Array of flashcard objects     |
-| `nf_settings_v1`    | User settings (theme, sizes…)  |
+All data is saved under these keys:
+| Key                        | Contents                             |
+| --------------------------- | ------------------------------------ |
+| `nf_tasks_v1`               | Array of task objects                |
+| `nf_flashcards_v1`          | Array of flashcard objects           |
+| `nf_settings_v1`            | User settings (theme, sizes…)        |
+| `nf_blocks_v1`               | Your custom Blocks/Categories tree   |
+| `nf_last_backup_v1`         | Timestamp of the last export         |
 Reload the page and everything is restored. Clearing browser storage (or the "Clear all" button in Settings) resets the app.
 ## 🎨 Customization
 ### Change colors
@@ -66,16 +77,8 @@ Edit CSS variables at the top of `style.css`:
 Or use **Settings → Accent color** in-app.
 ### Change theme
 Toggle via the moon/sun icon in the top bar, or use **Settings → Theme**.
-### Add a new block
-1. In `index.html`, copy an existing `<section class="view" id="view-xxx">` block and rename it.
-2. Add a matching `<button class="nav-item" data-view="xxx">` in the sidebar.
-3. Inside your block, add section panels — each needs:
-   - `<div class="panel section-panel" data-section="MyName">`
-   - An `<button class="add-task" data-block="xxx" data-section="MyName">` button
-   - A `<ul class="task-list" data-list="xxx::MyName"></ul>`
-That's it — the app handles the rest automatically.
-### Add a new section inside an existing block
-Duplicate one of the `.section-panel` divs and change `data-section` + the matching `data-list` value. Format: `block::section`.
+### Add a new block or category
+Use the **Add Block** button in the sidebar, or the **+** control inside an existing block — this is handled entirely by `blocks.js` at runtime now, no HTML editing required.
 ### Change fonts
 Swap the `<link>` in `index.html` for another Google Font and update `body { font-family: … }` in `style.css`.
 ## ♿ Accessibility

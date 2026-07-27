@@ -1,6 +1,16 @@
 /* ===================================================================
-   ANIMATION.JS — Ripple effects and small UI micro-animations
+   ANIMATION.JS — Ripple effects, small UI micro-animations, and
+   pausing the decorative background scene while the tab is hidden.
+   (prefers-reduced-motion is handled entirely in style.css — this
+   file only concerns itself with tab visibility.)
    =================================================================== */
+/* ===================================== */
+/* PAUSE STATE DECISION (pure, testable) */
+/* ===================================== */
+function shouldPauseAnimations({ hidden }) {
+  return !!hidden;
+}
+if (typeof document !== 'undefined') {
 /* ===================================== */
 /* RIPPLE EFFECT ON BUTTONS              */
 /* ===================================== */
@@ -39,3 +49,17 @@ document.addEventListener('click', (e) => {
   `;
   document.head.appendChild(style);
 })();
+/* ===================================== */
+/* PAUSE SCENE ANIMATION WHILE TAB HIDDEN */
+/* ===================================== */
+(function bindVisibilityPause() {
+  const apply = () => {
+    document.body.classList.toggle('anim-paused', shouldPauseAnimations({ hidden: document.hidden }));
+  };
+  document.addEventListener('visibilitychange', apply);
+  apply();
+})();
+} // end typeof document guard
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { shouldPauseAnimations };
+}
